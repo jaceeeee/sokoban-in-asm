@@ -15,6 +15,9 @@ MAIN PROC FAR
 	MOV DS, AX
 	MOV ES, AX
 
+	mov ah, 08h
+	int 10h
+	
 	inc total
 	mov al, total
 	

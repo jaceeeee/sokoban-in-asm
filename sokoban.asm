@@ -42,10 +42,7 @@ MAIN PROC FAR
 	push ax
 	mov ah, 0ch
 	mov al, 15
-	push ax
-	; mov ah, 14
-	; mov al, 6
-	; push ax
+	push ax	
 
 	; MOV DX, OFFSET PUZZLE1
 	; PUSH DX
@@ -80,8 +77,7 @@ GAME_LOOP PROC NEAR
 	  PUSH DX	 
 	  CALL DISPLAY
 	  ; insert the checking of the boxes-slots here	  
-	  ; if complete, jmp puzzle_exit
-	  CALL DELAY
+	  ; if complete, jmp puzzle_exit	  
 	  
 	  CALL GET_KEY
 	  MOV DL, HORIZONTAL
@@ -104,19 +100,20 @@ TEMP_PROC:
 	  call SET_CURSOR
 	  lea dx, DRAW_FIELD2
 	  mov ah, 09h
-	  int 21h
+	  int 21h	  
 	  JMP ITERATE	  
 RIGHT:
+	add dl, 1
+	push dx 
+	call SET_CURSOR
 	mov ah, 08h
 	int 10h
 	cmp al, '#'
-	je	right_proceed	
-	mov dh, VERTICAL
-	mov dl, HORIZONTAL
+	je	right_proceed		
 	cmp al, 'B'
 	JE ATTEMPT_RIGHT	
-	JMP PROC_RIGHT
-	ATTEMPT_RIGHT:		
+	; JMP PROC_RIGHT
+	ATTEMPT_RIGHT:				
 		CALL BLOCK_MOVEMENTS
 	PROC_RIGHT:
 	INC HORIZONTAL
@@ -133,8 +130,7 @@ LEFT:
 	CMP AL, 'B'
 	JE ATTEMPT_LEFT
 	JMP PROC_LEFT
-	ATTEMPT_LEFT:
-		PUSH DX
+	ATTEMPT_LEFT:		
 		CALL BLOCK_MOVEMENTS
 	PROC_LEFT:
 	DEC HORIZONTAL
@@ -151,8 +147,7 @@ UP:
 	CMP AL, 'B'
 	JE ATTEMPT_UP
 	JMP PROC_UP
-	ATTEMPT_UP:
-		PUSH DX
+	ATTEMPT_UP:		
 		CALL BLOCK_MOVEMENTS		
 	PROC_UP:
 	DEC VERTICAL	
@@ -184,23 +179,23 @@ GAME_LOOP ENDP
 ;---------------------------------------------------
 READ_PUZZLE_FILE PROC NEAR
 	pop bx 
-	pop dx ;lea dx, "puzzle<n>.txt"
+	pop dx 
 	push bx
-	MOV AH, 3DH           ;requst open file
-	MOV AL, 00            ;read only; 01 (write only); 10 (read/write)	
+	MOV AH, 3DH           
+	MOV AL, 00            
 	INT 21H	
 	JC RDISPLAY_ERROR1
 	MOV FILEHANDLE1, AX	
-	MOV AH, 3FH           ;request read record
-	MOV BX, FILEHANDLE1    ;file handle
-	MOV CX, 1000            ;record length
-	LEA DX, PUZZLE_STR    ;address of input area
+	MOV AH, 3FH           
+	MOV BX, FILEHANDLE1   
+	MOV CX, 1000          
+	LEA DX, PUZZLE_STR    
 	INT 21H
 	JC RDISPLAY_ERROR2
-	CMP AX, 00            ;zero bytes read?
+	CMP AX, 00            
 	JE RDISPLAY_ERROR3	
-  	MOV AH, 3EH           ;request close file
-  	MOV BX, FILEHANDLE1   ;file handle
+  	MOV AH, 3EH           
+  	MOV BX, FILEHANDLE1   
   	INT 21H
   	JMP CLOSE_FILE  	
 RDISPLAY_ERROR1:
@@ -219,18 +214,15 @@ CLOSE_FILE:
 	ret
 READ_PUZZLE_FILE ENDP
 ;----------------------------------------------------
-BLOCK_MOVEMENTS PROC NEAR
-  ; MOV BP, SP
-  ; mov ah, 02
-  ; mov dl, 'G'
-  ; int 21h
-  add bp, 2
-  BLOCK_LOOP:  
+BLOCK_MOVEMENTS PROC NEAR    
+  BLOCK_LOOP:    	
   	CMP DX, [BP]  	
-  	JE BLOCK_PROCEED
-  	ADD BP, 2
+  	JE BLOCK_PROCEED  	
+  	ADD BP, 2	
   	JMP BLOCK_LOOP
   BLOCK_PROCEED:
+  	MOV BX, [BP]
+  	PUSH BX
   	CMP DIRECTION, 4DH
   	JE BLOCK_RIGHT
   	CMP DIRECTION, 4BH
@@ -239,23 +231,31 @@ BLOCK_MOVEMENTS PROC NEAR
   	JE BLOCK_UP
   	CMP DIRECTION, 50H
   	JE BLOCK_DOWN
-  BLOCK_RIGHT:
- 	MOV 
-  	INC DX
-  	; MOV AH, 0
-  	; CMP AL, ' '
-  	MOV DL, HORIZONTAL
-  	MOV DH, VERTICAL
-  	INC DX
+  BLOCK_RIGHT:  
+	INC DL 	
+  	PUSH DX
+  	CALL SET_CURSOR
+  	MOV AH, 08H
+  	INT 10H  	  	
+  	CMP AL, ' '
+  	JNE EXIT_BLOCK_LOOP
+  	POP BX
+  	INC BL   	
   	JMP B_MOV
-  	; JMP EXIT_BLOCK_LOOP
-  BLOCK_LEFT:
+  BLOCK_LEFT:  	
+  	POP BX
+  	DEC BL   	
+  	JMP B_MOV
   BLOCK_UP:
+  	POP BX
+  	DEC BH
+  	JMP B_MOV
   BLOCK_DOWN:
-  B_MOV:  	
-  	MOV [BP], DX
-  	CALL DRAW_BOXES
-  	
+  	POP BX
+  	INC BH 
+  	JMP B_MOV
+  B_MOV:  	  	  	
+  	MOV [BP], BX
   EXIT_BLOCK_LOOP:
   	RET  
 BLOCK_MOVEMENTS ENDP
@@ -274,6 +274,11 @@ DRAW_BOXES PROC NEAR
   	MOV AH, 09H
   	INT 21H
   	LOOP D_B
+  MOV CL, TGC
+  DEC CL
+  R_B:
+  	SUB BP, 2
+  	LOOP R_B
   RET
 DRAW_BOXES ENDP
 ;----------------------------------------------------
@@ -314,20 +319,6 @@ DISPLAY PROC NEAR
 
   RET
 DISPLAY ENDP
-;---------------------------------------------------
-DELAY PROC	NEAR
-	mov bp, 2 ;lower value faster
-	mov si, 2 ;lower value faster
-	
-	delay2:
-		dec bp
-		nop
-		jnz delay2
-		dec si
-		cmp si,0
-		jnz delay2
-		RET
-DELAY ENDP
 ;---------------------------------------------------
 GET_KEY	PROC NEAR
 	MOV		AH, 10H
