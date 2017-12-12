@@ -20,6 +20,7 @@ DATASEG SEGMENT PARA 'Data'
 	LSP DW ? ;LAST STACK POSITION
 	SOP DW ? ; goals stack position
 	PLAYER_MOVENUM DW ?
+	RES DB ?
 	;FOR FILE READING
 	;--------------------------------------------------------------------------
 	PUZZLE1  DB 'puzzle1.txt', 00H	
@@ -37,7 +38,9 @@ MAIN PROC FAR
 	MOV DS, AX
 	MOV ES, AX	
 
+PUZZLE1_LOOP:
 	MOV SOLVED, 'N'
+	MOV RES, 'N'
 	MOV VERTICAL, 12
 	MOV HORIZONTAL, 38
 	MOV DIRECTION, 04DH
@@ -104,6 +107,10 @@ MAIN PROC FAR
 	POP_1:
 		POP AX 
 	LOOP POP_1
+	CMP RES, 'N'
+	JE MAIN_EXIT
+	JMP PUZZLE1_LOOP
+
 	; MOV SOLVED, 'N'
  ;  	MOV VERTICAL, 14  	 ;vertical position coordinates
 	; MOV HORIZONTAL, 40  ;horizontal position coordinates
@@ -248,16 +255,16 @@ GAME_LOOP PROC NEAR
 	  JE U_EXTENS
 	  CMP DIRECTION, 50H
 	  JE D_EXTENS
-	  CMP AL, 1BH
-	  JNE TEMP_PROC
 	  CMP AL, 'R'
 	  JE RESET
 	  CMP AL, 'r'
 	  JE RESET
+	  CMP AL, 1BH
+	  JNE TEMP_PROC
 	  JMP PUZZLE_EXIT
 RESET: 
-;---------------UNFINISHED
-
+	MOV RES, 'Y'
+	JMP PUZZLE_EXIT
 TEMP_PROC:
 	  CALL CLEAR_SCREEN
 	  mov dl, 1
@@ -290,6 +297,8 @@ RIGHT:
 	INC HORIZONTAL
 	right_proceed:
 	JMP ITERATE
+	D_EXTENS:
+		JMP DOWN
 LEFT:	
 	SUB DL, 1
 	PUSH DX
@@ -311,8 +320,6 @@ LEFT:
 	DEC HORIZONTAL
 	LEFT_PROCEED:
 	JMP ITERATE	
-	D_EXTENS:
-		JMP DOWN
 UP:	
 	SUB DH, 1
 	PUSH DX
