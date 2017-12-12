@@ -6,7 +6,6 @@ STACKSEG ENDS
 DATASEG SEGMENT PARA 'Data'
 	CURSOR DB "A$"
 	BOX DB "B$"
-	GOAL DB "%$"
 	HORIZONTAL DB ?
 	VERTICAL DB ?	
 	DIRECTION DB ?
@@ -16,6 +15,11 @@ DATASEG SEGMENT PARA 'Data'
 	DRAW_FIELD2 DB 78 DUP('#'), 0ah, 0dh, 21 DUP(" #", 76 DUP(' '), '#', 0AH, 0DH), ' ', 78 DUP('#'), '$'
 	N_M DB ?
 	SOLVED DB ?
+	GOAL DB ?
+	OCCUPIED DB "C$"
+	LSP DW ? ;LAST STACK POSITION
+	SOP DW ? ; goals stack position
+	PLAYER_MOVENUM DW ?
 	;FOR FILE READING
 	;--------------------------------------------------------------------------
 	PUZZLE1  DB 'puzzle1.txt', 00H	
@@ -34,40 +38,172 @@ MAIN PROC FAR
 	MOV ES, AX	
 
 	MOV SOLVED, 'N'
-  	MOV VERTICAL, 13  	 ;vertical position coordinates
-	MOV HORIZONTAL, 40  ;horizontal position coordinates
-	MOV DIRECTION, 04DH  	;which direction is it going to go
-
+	MOV VERTICAL, 12
+	MOV HORIZONTAL, 38
+	MOV DIRECTION, 04DH
+	
+	MOV AH, 10
+	MOV AL, 38
+	PUSH AX	
+	MOV AH, 11
+	MOV AL, 37
+	PUSH AX
+	MOV AH, 11
+	MOV AL, 39
+	PUSH AX
+	MOV AH, 12
+	MOV AL, 36
+	PUSH AX
+	MOV AH, 12
+	MOV AL, 40
+	PUSH AX
+	MOV AH, 13
+	MOV AL, 37
+	PUSH AX
 	MOV AH, 13
 	MOV AL, 39
 	PUSH AX
-	mov ah, 13
-	mov al, 37
-	push ax
-	mov ah, 12
-	mov al, 40
-	push ax	
-	MOV AH, 12
-	MOV AL, 41
+	MOV AH, 14
+	MOV AL, 38
 	PUSH AX
+	MOV SOP, SP
+
 	MOV AH, 10
+	MOV AL, 38
+	PUSH AX
+	MOV AH, 11
+	MOV AL, 37
+	PUSH AX
+	MOV AH, 11
+	MOV AL, 38
+	PUSH AX
+	MOV AH, 11
 	MOV AL, 39
 	PUSH AX
-	MOV DX, OFFSET PUZZLE2
+	MOV AH, 12
+	MOV AL, 36
+	PUSH AX
+	MOV AH, 12
+	MOV AL, 40
+	PUSH AX
+	MOV AH, 13
+	MOV AL, 37
+	PUSH AX
+	MOV AH, 13
+	MOV AL, 39
+	PUSH AX
+	MOV DX, OFFSET PUZZLE1
 	PUSH DX
 	CALL READ_PUZZLE_FILE
 
-	MOV TGC, 5
+	MOV TGC, 8
 	MOV RGC, 0
 	CALL GAME_LOOP
+
+	MOV CX, 16
+	POP_1:
+		POP AX 
+	LOOP POP_1
+	; MOV SOLVED, 'N'
+ ;  	MOV VERTICAL, 14  	 ;vertical position coordinates
+	; MOV HORIZONTAL, 40  ;horizontal position coordinates
+	; MOV DIRECTION, 04DH  	;which direction is it going to go
+
+	; ;GOALS for puzzle 2
+	; MOV AH, 13
+	; MOV AL, 38
+	; PUSH AX
+	; MOV AH, 12
+	; MOV AL, 40
+	; PUSH AX
+	; MOV AH, 11
+	; MOV AL, 39
+	; PUSH AX
+	; MOV AH, 11
+	; MOV AL, 38
+	; PUSH AX
+	; MOV AH, 11
+	; MOV AL, 37
+	; PUSH AX
+	; MOV SOP, SP
+
+	; ;BOXES FOR PUZZLE 2
+	; MOV AH, 13
+	; MOV AL, 39
+	; PUSH AX
+	; mov ah, 13
+	; mov al, 37
+	; PUSH AX
+	; MOV AH, 12
+	; MOV AL, 40
+	; PUSH AX	
+	; MOV AH, 12
+	; MOV AL, 41
+	; PUSH AX
+	; MOV AH, 10
+	; MOV AL, 39
+	; PUSH AX
+
+	; MOV DX, OFFSET PUZZLE2
+	; PUSH DX
+	; CALL READ_PUZZLE_FILE
+
+	; MOV TGC, 5
+	; MOV RGC, 0
+	; CALL GAME_LOOP
+
+	; MOV CX, 10
+	; POP_2:
+	; 	POP AX
+	; LOOP POP_2
 MAIN_EXIT:	
 	MOV AH, 4CH
 	INT 21H	
 MAIN ENDP
 ;----------------------------------------------------
+; STORE_GOALS PROC NEAR
+; 	MOV DH, 6
+; 	MOV DL, 25
+; 	MOV CX, 12	
+; 	  LOOP1:
+; 	    PUSH CX
+; 	    MOV DH, 6
+; 	    MOV BH, CX
+; 	    SUB 
+;         MOV CX, 30
+;           LOOP2:	        
+;             ADD DH, BH 
+;             ADD DL, BL
+;             MOV AH, 08H
+;             INT 10H
+;             CMP AL, '%'
+
+;             INC BL
+; 	      LOOP LOOP2:
+; 	    POP CX
+; 	    INC BH
+; 	  LOOP LOOP1
+; 	RET
+; STORE_GOALS ENDP
+;----------------------------------------------------
+; STORE_BOXES PROC NEAR
+; 	MOV CX, 12
+; 	  LOOP1:
+; 	    PUSH CX
+;         MOV CX, 30
+;           LOOP2:	        
+
+; 	      LOOP LOOP2:
+; 	    POP CX
+
+; 	  LOOP LOOP1
+; 	RET
+; STORE_BOXES ENDP
+;----------------------------------------------------
 GAME_LOOP PROC NEAR	
 	ITERATE:
-	  MOV BP, SP	  
+	  MOV BP, SP
+	  MOV LSP, BP
 	  CALL CLEAR_SCREEN	  
 	  mov DH, 6	  
 	  mov DL, 25
@@ -76,7 +212,19 @@ GAME_LOOP PROC NEAR
 	  lea dx, PUZZLE_STR
 	  mov ah, 09h
 	  int 21h
-	  CALL DRAW_BOXES 
+	  CALL DRAW_BOXES
+	  CALL DRAW_GOALS
+	  
+	  MOV DL, RGC 
+	  CMP DL, TGC
+	  JE PUZZLE_EXIT
+	  JMP GL_PROC1
+	PUZZLE_EXIT:
+	  MOV DX, 184FH
+	  PUSH DX
+	  CALL SET_CURSOR
+	  RET
+	  GL_PROC1:
 	  MOV DL, HORIZONTAL
 	  MOV DH, VERTICAL
 	  PUSH DX
@@ -97,7 +245,7 @@ GAME_LOOP PROC NEAR
 	  CMP DIRECTION, 4BH
 	  JE LEFT
 	  CMP DIRECTION, 48H
-	  JE UP
+	  JE U_EXTENS
 	  CMP DIRECTION, 50H
 	  JE D_EXTENS
 	  CMP AL, 1BH
@@ -119,6 +267,8 @@ TEMP_PROC:
 	  mov ah, 09h
 	  int 21h	  
 	  JMP ITERATE	  
+	U_EXTENS:
+		JMP UP
 RIGHT:
 	mov ah, 08h
 	int 10h
@@ -129,6 +279,8 @@ RIGHT:
 	call SET_CURSOR
 	cmp al, 'B'
 	JE ATTEMPT_RIGHT	
+	CMP AL, 'C'
+	JE ATTEMPT_RIGHT
 	JMP PROC_RIGHT	
 	ATTEMPT_RIGHT:				
 		CALL BLOCK_MOVEMENTS
@@ -148,6 +300,8 @@ LEFT:
 	JE LEFT_PROCEED
 	CMP AL, 'B'
 	JE ATTEMPT_LEFT	
+	CMP AL, 'C'
+	JE ATTEMPT_LEFT
 	JMP PROC_LEFT
 	ATTEMPT_LEFT:		
 		CALL BLOCK_MOVEMENTS
@@ -165,9 +319,11 @@ UP:
 	CALL SET_CURSOR
 	MOV AH, 08H
 	INT 10H
-	CMP AL, '#'	
-	JE UP_PROCEED	
+	CMP AL, '#'
+	JE UP_PROCEED
 	CMP AL, 'B'
+	JE ATTEMPT_UP
+	CMP AL, 'C'
 	JE ATTEMPT_UP
 	JMP PROC_UP
 	ATTEMPT_UP:		
@@ -188,7 +344,9 @@ DOWN:
 	JE DOWN_PROCEED
 	CMP AL, 'B'
 	JE ATTEMPT_DOWN
-	JMP PROC_DOWN
+	CMP AL, 'C'
+	JE ATTEMPT_DOWN
+	JMP PROC_DOWN	
 	ATTEMPT_DOWN:		
 		CALL BLOCK_MOVEMENTS
 		CMP N_M, 'N'
@@ -197,11 +355,6 @@ DOWN:
 	INC VERTICAL
 	DOWN_PROCEED:
 	JMP ITERATE
-PUZZLE_EXIT:
-	MOV DX, 184FH
-	PUSH DX
-	CALL SET_CURSOR
-	RET
 GAME_LOOP ENDP
 ;---------------------------------------------------
 READ_PUZZLE_FILE PROC NEAR
@@ -241,9 +394,10 @@ CLOSE_FILE:
 	ret
 READ_PUZZLE_FILE ENDP
 ;----------------------------------------------------
-BLOCK_MOVEMENTS PROC NEAR    
+BLOCK_MOVEMENTS PROC NEAR
+  MOV BP, LSP    
   BLOCK_LOOP:    	
-  	CMP DX, [BP]  	
+  	CMP DX, [BP]  	;BP SHOULD BE PUSHED ONE MORE TIME SO IT DOESN'T ACCIDENTALLY MESS UP STACK
   	JE BLOCK_PROCEED  	
   	ADD BP, 2	
   	JMP BLOCK_LOOP
@@ -338,6 +492,7 @@ BLOCK_MOVEMENTS PROC NEAR
 BLOCK_MOVEMENTS ENDP
 ;----------------------------------------------------
 DRAW_BOXES PROC NEAR
+  MOV BP, LSP
   MOV CX, 0			
   MOV CL, TGC 			; SET COUNTER TO NUMBER OF BOXES
 
@@ -346,49 +501,51 @@ DRAW_BOXES PROC NEAR
   	MOV DX, [BP]
   	PUSH DX  	
   	CALL SET_CURSOR
-  	LEA DX, BOX
-  	MOV AH, 09H
+  	MOV SI, OFFSET BOX
+  	MOV DL, [SI]
+  	MOV AH, 02H
   	INT 21H
-  	LOOP D_B
+  LOOP D_B
 
-  MOV CL, TGC 			; RESTORE ORIGINAL POS OF BP
-  DEC CL
-  
-  R_B:
-  	SUB BP, 2
-  	LOOP R_B
   RET
 DRAW_BOXES ENDP
 ;----------------------------------------------------
 DRAW_GOALS PROC NEAR
+  MOV BP, SOP
   MOV CX, 0
   MOV CL, TGC 			;SET COUNTER TO NUMBER OF BOXES
-  
-  D_G:					; ITERATE OVER ALL THE BOXES
-  	ADD BP, 2
-  	LOOP D_B 
-  
-  MOV CL, TGC 			; SET COUNTER TO NUMBER OF GOALS
+  MOV RGC, 0
 
   D_G2:					; ITERATE OVER ALL THE GOALS
-  	ADD BP, 2
   	MOV DX, [BP]
+  	ADD BP, 2
   	PUSH DX 
   	CALL SET_CURSOR
-  	LEA DX, GOAL
-  	MOV AH, 09H
-  	INT 21H
-  	LOOP D_G2 
-
-  MOV CL, TGC 
-  ADD CL, TGC
-  DEC CL 
-  R_G:					; RESTORE ORIGINAL POS OF BP
-  	SUB BP, 2
-  	LOOP R_B
+  	CALL CHECK_GOALS
+  LOOP D_G2 
+  
   RET
 DRAW_GOALS ENDP
 ;----------------------------------------------------
+CHECK_GOALS PROC NEAR
+	MOV AH, 08H
+	INT 10H
+	CMP AL, 'B'
+	JE COMPLETE	
+	JMP NC
+	COMPLETE:
+	  INC RGC	  
+	  MOV GOAL, 'C'
+	  JMP R_CG
+	NC:
+	  MOV GOAL, '%'
+	R_CG:
+	  MOV SI, OFFSET GOAL
+	  MOV DL, [SI]
+	  MOV AH, 02H
+	  INT 21H
+	RET 
+CHECK_GOALS ENDP
 CLEAR_SCREEN PROC NEAR
   MOV AX, 0600H   
   MOV BH, 01H     
