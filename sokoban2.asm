@@ -7,24 +7,27 @@ TITLE FILE READ (SIMPLFIED .EXE FORMAT)
 .DATA
   INITIAL DW 0100H
 
-  PATHFILENAME  DB 'testing.txt', 00H
+  STARTSCREEN  DB 'start.txt', 00H
+  HOWSCREEN DB 'how_play.txt', 00H
   FILEHANDLE    DW ?
 
   ERROR1_STR    DB 'Error in opening file.$'
   ERROR2_STR    DB 'Error reading from file.$'
   ERROR3_STR    DB 'No record read from file.$'
-  RECORD_STR    DB 1000 DUP('$'), '$'  ;length = original length of record + 1 (for $)
+  RECORD_STR    DB 2000 DUP('$'), '$'  ;length = original length of record + 1 (for $)
 
   ARROW DB 175, '$'
-  ARROW_POS_START DW 0A1EH
-  ARROW_POS_HOW DW 0C1CH
-  ARROW_POS_EXIT DW 0E1EH
-  ARROW_POS DW 0A1EH
-  TEST_STR DB 'TEST$'
+  ARROW_POS_START DW 0E1EH
+  ARROW_POS_HOW DW 101CH
+  ARROW_POS_EXIT DW 121EH
+  ARROW_POS DW ?
+  HOW_BACK DW 170BH
+  HOW_START DW 1724H
 
-  ERASE DB ' ', '$'
-  ESCAPE DB 01BH
+  ERASE DB 33
   ENTER_KEY DB 1CH
+  LEFT_ARROW DB 4BH
+  RIGHT_ARROW DB 50H
   UP_ARROW DB 48H
   DOWN_ARROW DB 50H
   INPUT DB ?
@@ -35,12 +38,9 @@ MAIN PROC FAR
   MOV DS, AX
 
   ;set the cursor initial cursor in the beginning
-  MOV DX, OFFSET INITIAL
-  PUSH DX
-  CALL SET_CURSOR
-
-  CALL _CLEAR_SCREEN
-  CALL OPEN_FILE
+  ;calling start screen
+  ;MOV DX, OFFSET RECORD_STR
+  ;CPUSH DX
 
   PLAY:
     CALL CHOOSE_MENU
@@ -49,20 +49,33 @@ EXIT:
   MOV AH, 4CH
   INT 21H
 MAIN ENDP
+;---------------------------------------------------
+INITIAL_CURSOR PROC NEAR
+  MOV DX, OFFSET INITIAL
+  PUSH DX
+  CALL SET_CURSOR
+  RET
+INITIAL_CURSOR ENDP
 ;----------------------------------------------------
 OPEN_FILE PROC NEAR
+  POP BX
+  POP DX
+  PUSH BX
+
   MOV AH, 3DH           ;requst open file
   MOV AL, 00            ;read only; 01 (write only); 10 (read/write)
-  MOV DX, OFFSET PATHFILENAME
   INT 21H
   JC DISPLAY_ERROR1
   MOV FILEHANDLE, AX
 
+  ;POP BX
+  ;POP DX
+  ;PUSH BX
   ;read file
   MOV AH, 3FH           ;request read record
   MOV BX, FILEHANDLE    ;file handle
-  MOV CX, 1000          ;record length
-  MOV DX, OFFSET RECORD_STR    ;address of input area
+  MOV CX, 2000          ;record length
+  MOV DX, OFFSET RECORD_STR
   INT 21H
   JC DISPLAY_ERROR2
   CMP AX, 00            ;zero bytes read?
@@ -77,7 +90,6 @@ OPEN_FILE PROC NEAR
   MOV AH, 3EH           ;request close file
   MOV BX, FILEHANDLE    ;file handle
   INT 21H
-
   RET
 
   DISPLAY_ERROR1:
@@ -103,94 +115,180 @@ OPEN_FILE PROC NEAR
 OPEN_FILE ENDP
 ;----------------------------------------------------
 _GET_KEY	PROC	NEAR
-		MOV   AH, 10H
-    INT   16H
+		MOV	AH, 10H		;get input	MOV AH, 10H; INT 16H
+		INT	16H
 
-    MOV   INPUT, AH
-
-    __LEAVETHIS:
-    RET 
+		MOV	INPUT, AH
+    RET
 _GET_KEY 	ENDP
 
 ;----------------------------------------------------
 CHOOSE_MENU PROC NEAR
+  CALL INITIAL_CURSOR
+  CALL _CLEAR_SCREEN
+
+  MOV DX, OFFSET STARTSCREEN
+  PUSH DX
+  CALL OPEN_FILE
+
+  MOV AX, ARROW_POS_START
+  MOV ARROW_POS, AX
   CHOOSING:
-    CALL _DELAY
+    MOV AX, 0
+    MOV BX, 0
+    MOV CX, 0
+    MOV DX, 0
     MOV DX, ARROW_POS
     PUSH DX
     CALL SET_CURSOR
 
-    MOV AH, 09H
-    MOV DX, OFFSET ARROW
+    MOV AL, 02H
+    MOV DL, ARROW
     INT 21H
 
     GETTING_INP:
       MOV AH, 0
       CALL _GET_KEY
-      MOV AH, INPUT
+      MOV AL, INPUT
 
-      CMP AH, DOWN_ARROW
+      CMP AL, DOWN_ARROW
       JE DOWN
 
-      CMP AH, UP_ARROW
+      CMP AL, UP_ARROW
       JE UP
 
-      CMP AH, ENTER_KEY
+      CMP AL, ENTER_KEY
       JE CHECK_INST
-      
+
       JMP GETTING_INP
 
     CHECK_INST:
-      MOV BL, 1EH
-      MOV AL, 02
-      MOV DL, ARROW
-      INT 21h      
-
       MOV BX, ARROW_POS_EXIT
       CMP ARROW_POS, BX
       JE NEW_EXIT
+
+      MOV BX, ARROW_POS_HOW
+      CMP ARROW_POS, BX
+      JE HOW_INST
 
       NEW_EXIT:
         MOV AH, 4CH
         INT 21H
     DOWN:
-      CMP ARROW_POS, 0A1EH ;OFFSET ARROW_POS_START
+      MOV AX, ARROW_POS_START
+      CMP ARROW_POS, AX ;OFFSET ARROW_POS_START
       JE DOWN_HOW
-      CMP ARROW_POS, 0C1CH ;OFFSET ARROW_POS_HOW
+      MOV AX, ARROW_POS_HOW
+      CMP ARROW_POS, AX ;OFFSET ARROW_POS_HOW
       JE DOWN_EXIT
+      JMP GETTING_INP
 
       DOWN_HOW:
+        CALL _CLEAR
         MOV AX, ARROW_POS_HOW
         MOV ARROW_POS, AX
-        JMP CLEAR
+        JMP CHOOSING
 
       DOWN_EXIT:
+        CALL _CLEAR
         MOV AX, ARROW_POS_EXIT
         MOV ARROW_POS, AX
-        JMP CLEAR
-
+        JMP CHOOSING
     UP:
-      CMP ARROW_POS, 0E1EH ;OFFSET ARROW_POS_EXIT
+      MOV AX, ARROW_POS_EXIT
+      CMP ARROW_POS, ax ;OFFSET ARROW_POS_EXIT
       JE UP_HOW
-
-      CMP ARROW_POS, 0C1CH ;OFFSET ARROW_POS_HOW
+      MOV AX, ARROW_POS_HOW
+      CMP ARROW_POS, AX ;OFFSET ARROW_POS_HOW
       JE UP_START
+      JMP GETTING_INP
 
       UP_HOW:
+        CALL _CLEAR
         MOV AX, ARROW_POS_HOW
         MOV ARROW_POS, AX
-        JMP CLEAR
+        JMP CHOOSING
 
       UP_START:
+        CALL _CLEAR
         MOV AX, ARROW_POS_START
         MOV ARROW_POS, AX
-        JMP CLEAR
+        JMP CHOOSING
 
-      CLEAR:
-
-      JMP CHOOSING
-  RET
+  EXTRA_JMP:
+    JMP CHOOSE_MENU
 CHOOSE_MENU ENDP
+;---------------------------------------------------
+HOW_INST PROC NEAR
+  CALL INITIAL_CURSOR
+  CALL _CLEAR_SCREEN
+  MOV DX, OFFSET HOWSCREEN
+  PUSH DX
+  CALL OPEN_FILE
+
+  MOV AX, HOW_BACK
+  MOV ARROW_POS, AX
+  CHOOSE:
+    MOV DX, ARROW_POS
+    PUSH DX
+    CALL SET_CURSOR
+
+    MOV AL, 02H
+    MOV DL, ARROW
+    INT 21H
+
+    CALL _GET_KEY
+    MOV AL, INPUT
+
+    CMP AL, LEFT_ARROW
+    JE LEFT
+
+    CMP AL, RIGHT_ARROW
+    JE RIGHT
+
+    CMP AL, ENTER_KEY
+    JE CHECK_INST2
+
+    CHECK_INST2:
+      MOV AX, HOW_BACK
+      CMP ARROW_POS, AX
+      JE EXTRA_JMP
+
+      JMP CHOOSE
+    LEFT:
+      MOV AX, HOW_START
+      CMP ARROW_POS, AX
+      JE LEFT_BACK
+      JMP CHOOSE
+
+      LEFT_BACK:
+        CALL _CLEAR
+        MOV AX, HOW_BACK
+        MOV ARROW_POS, AX
+        JMP CHOOSE
+
+    RIGHT:
+      MOV AX, HOW_BACK
+      CMP ARROW_POS, AX
+      JE RIGHT_START
+      JMP CHOOSE
+
+      RIGHT_START:
+        CALL _CLEAR
+        MOV AX, HOW_START
+        MOV ARROW_POS, AX
+        JMP CHOOSE
+
+HOW_INST ENDP
+;--------------------------------------------------
+_CLEAR PROC NEAR ;CLEARS THE ARROW
+  MOV AX, 0600H
+  MOV BH, 71H
+  MOV CX, ARROW_POS
+  MOV DX, ARROW_POS
+  INT 10H
+  RET
+_CLEAR ENDP
 ;----------------------------------------------------
 _DELAY PROC	NEAR
     mov bp, 2 ;lower value faster
