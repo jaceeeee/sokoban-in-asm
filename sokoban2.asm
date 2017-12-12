@@ -20,9 +20,11 @@ TITLE FILE READ (SIMPLFIED .EXE FORMAT)
   ARROW_POS_HOW DW 0C1CH
   ARROW_POS_EXIT DW 0E1EH
   ARROW_POS DW 0A1EH
+  TEST_STR DB 'TEST$'
 
   ERASE DB ' ', '$'
-  ENTER_KEY DB 0AH
+  ESCAPE DB 01BH
+  ENTER_KEY DB 1CH
   UP_ARROW DB 48H
   DOWN_ARROW DB 50H
   INPUT DB ?
@@ -101,16 +103,13 @@ OPEN_FILE PROC NEAR
 OPEN_FILE ENDP
 ;----------------------------------------------------
 _GET_KEY	PROC	NEAR
-		MOV	AH, 01H		;check for input
-		INT	16H
+		MOV   AH, 10H
+    INT   16H
 
-    JZ	GETTING_INP
+    MOV   INPUT, AH
 
-		MOV	AH, 00H		;get input	MOV AH, 10H; INT 16H
-		INT	16H
-
-		MOV	INPUT, AH
-    RET
+    __LEAVETHIS:
+    RET 
 _GET_KEY 	ENDP
 
 ;----------------------------------------------------
@@ -128,30 +127,27 @@ CHOOSE_MENU PROC NEAR
     GETTING_INP:
       MOV AH, 0
       CALL _GET_KEY
-      MOV AL, INPUT
+      MOV AH, INPUT
 
-      CMP AL, DOWN_ARROW
+      CMP AH, DOWN_ARROW
       JE DOWN
 
-      CMP AL, UP_ARROW
+      CMP AH, UP_ARROW
       JE UP
 
-      CMP AL, ENTER_KEY
+      CMP AH, ENTER_KEY
       JE CHECK_INST
-
+      
       JMP GETTING_INP
 
     CHECK_INST:
-      ; MOV BL, 1EH
-      ; MOV AL, 02
-      ; MOV DL, ARROW
-      ; INT 21h
-      ; MOV AH, 03H
-      ; INT 10H
-      ; DEC DL
+      MOV BL, 1EH
+      MOV AL, 02
+      MOV DL, ARROW
+      INT 21h      
 
       MOV BX, ARROW_POS_EXIT
-      CMP ARROW_POS, DX
+      CMP ARROW_POS, BX
       JE NEW_EXIT
 
       NEW_EXIT:
@@ -164,23 +160,11 @@ CHOOSE_MENU PROC NEAR
       JE DOWN_EXIT
 
       DOWN_HOW:
-        MOV DX, ARROW_POS_START
-        PUSH DX 
-        CALL SET_CURSOR
-        MOV AH, 02H
-        MOV DL, ' '
-        INT 09H
         MOV AX, ARROW_POS_HOW
         MOV ARROW_POS, AX
         JMP CLEAR
 
       DOWN_EXIT:
-        MOV DX, ARROW_POS_HOW 
-        PUSH DX 
-        CALL SET_CURSOR
-        MOV AH, 02H
-        MOV DL, ' '
-        INT 09H
         MOV AX, ARROW_POS_EXIT
         MOV ARROW_POS, AX
         JMP CLEAR
@@ -193,23 +177,11 @@ CHOOSE_MENU PROC NEAR
       JE UP_START
 
       UP_HOW:
-        MOV DX, ARROW_POS_EXIT
-        PUSH DX 
-        CALL SET_CURSOR
-        MOV AH, 02H
-        MOV DL, ' '
-        INT 09H
         MOV AX, ARROW_POS_HOW
         MOV ARROW_POS, AX
         JMP CLEAR
 
       UP_START:
-        MOV DX, ARROW_POS_HOW 
-        PUSH DX 
-        CALL SET_CURSOR
-        MOV AH, 02H
-        MOV DL, ' '
-        INT 09H
         MOV AX, ARROW_POS_START
         MOV ARROW_POS, AX
         JMP CLEAR
