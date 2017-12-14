@@ -11,25 +11,36 @@ DATASEG SEGMENT PARA 'Data'
 	;-----------------------------------------------------------------------------
 	INITIAL DW 0100H
 	FILEHANDLE DW ?
+	FILESIZE DW 2000
+	GAME_AGAIN DW 170EH
+  	GAME_EXIT DW 1737H
   	STARTSCREEN  DB 'start.txt', 00H
   	HOWSCREEN DB 'how_play.txt', 00H
 	RECORD_STR    DB 2000 DUP('$'), '$'  ;length = original length of record + 1 (for $)
+	COPY		  DB 2000 DUP('$'), '$'  ;length = original length of record + 1 (for $)
   	ARROW DB 175, '$'
 	ARROW_POS_START DW 0E1EH
 	ARROW_POS_HOW DW 101CH
 	ARROW_POS_EXIT DW 121EH
 	ARROW_POS DW ?
-	HOW_BACK DW 170BH
-	HOW_START DW 1724H
+	GAMEOVER DB 'over.txt', 00H
+	HOW_BACK DW 1712H
+	HOW_START DW 172FH
 
 	ERASE DB 33
     ENTER_KEY DB 1CH
     LEFT_ARROW DB 4BH
-    RIGHT_ARROW DB 50H
+    RIGHT_ARROW DB 4DH
     UP_ARROW DB 48H
     DOWN_ARROW DB 50H
     INPUT DB ?	
     SCORE DB 7 DUP ('0'), '$'
+    COPY_S DB 7 DUP ('0'), '$'
+    BES_SCORE_STR DB 7 DUP ('0'), '$'
+    BES_SCORE DW ?
+    PROMPT DB "SCORE: $"
+    BES_PROMPT DB "PREVIOUS SCORE: $"
+    AF DB ?
   	;-----------------------------------------------------------------------------
   	; for game logic
   	;-----------------------------------------------------------------------------
@@ -55,11 +66,21 @@ DATASEG SEGMENT PARA 'Data'
 	;-----------------------------------------------------------------------------
 	PUZZLE1  DB 'puzzle1.txt', 00H	
 	PUZZLE2  DB 'puzzle2.txt', 00H
-	FILEHANDLE1	  DW ?	
-	PUZZLE_STR    DB 1001d DUP('$') ;length = original length of record + 1 (for $)
+	PUZZLE3  DB 'puzzle3.txt', 00H
+	PUZZLE4  DB 'puzzle4.txt', 00H
+	PUZZLE5  DB 'puzzle5.txt', 00H
+	WRITEPATHFILENAME 	DB 	'best.txt', 00H	
+	CTR 	DW 	7
+
+	PUZFILEHANDLE	  DW ?
+	WRITEFILEHANDLE	  DW ?	
+	PUZZLE_STR    DB 2000 DUP('$') ;length = original length of record + 1 (for $)
  	ERROR1_RSTR    DB 'Error in opening file.$'
     ERROR2_RSTR    DB 'Error reading from file.$'
     ERROR3_RSTR    DB 'No record read from file.$'    
+    ERROR1_WSTR    DB 'Error in creating file.$'
+ 	ERROR2_WSTR    DB 'Error writing in file.$'
+	ERROR3_WSTR    DB 'Record not written properly.$'	
 ;--------------------------------------
 CODESEG SEGMENT PARA 'Code'
 	ASSUME SS:STACKSEG, DS:DATASEG, CS:CODESEG
@@ -67,17 +88,42 @@ MAIN PROC FAR
 	MOV AX, DATASEG
 	MOV DS, AX
 	MOV ES, AX
+	
+	MOV AF, 'N'
+	MOV PLAYER_PUSHNUM, 0
+	CALL GET_BEST_SCORE	
+	
+	CALL CONVERT_SCORE_FROM_FILE		
+	CALL CONVERT_BEST_SCORE	
 
+	; JMP MAIN_EXIT	
 	MOV PLAYER_PUSHNUM, 0
 	PLAY:
 		CALL CHOOSE_MENU	
 
 MAIN_EXIT:	
+	CALL CONVERT_SCORE
+	CALL WRITE_SCORE
+	JMP FINISHED
+WRITE_S:
+	MOV AX, PLAYER_PUSHNUM
+	MOV BES_SCORE, AX
+	CALL CONVERT_SCORE
+	CALL WRITE_SCORE
+FINISHED:
 	MOV AH, 4CH
 	INT 21H	
 MAIN ENDP
 ;----------------------------------------------------
 START_PUZZLE_LOOPING PROC NEAR	
+	MOV PLAYER_PUSHNUM, 0
+	
+	CLD
+	MOV CX, 7
+	MOV SI, OFFSET COPY_S
+	MOV DI, OFFSET SCORE
+	REP MOVSB
+
 PUZZLE1_LOOP:
 	MOV SOLVED, 'N'
 	MOV RES, 'N'
@@ -85,6 +131,7 @@ PUZZLE1_LOOP:
 	MOV HORIZONTAL, 38
 	MOV DIRECTION, 04DH
 	
+	; goals for puzzle 1
 	MOV AH, 10
 	MOV AL, 38
 	PUSH AX	
@@ -111,6 +158,7 @@ PUZZLE1_LOOP:
 	PUSH AX
 	MOV SOP, SP
 
+	; boxes for puzzle 1
 	MOV AH, 10
 	MOV AL, 38
 	PUSH AX
@@ -135,6 +183,7 @@ PUZZLE1_LOOP:
 	MOV AH, 13
 	MOV AL, 39
 	PUSH AX
+
 	MOV DX, OFFSET PUZZLE1
 	PUSH DX
 	CALL READ_PUZZLE_FILE
@@ -207,11 +256,195 @@ PUZZLE2_LOOP:
 	LOOP POP_2
 
 	CMP RES, 'N'
-	JE MAIN_LOOP_EXIT
+	JE PUZZLE3_LOOP
 	JMP PUZZLE2_LOOP
 
-	MAIN_LOOP_EXIT:
-	JMP MAIN_EXIT
+PUZZLE3_LOOP:
+	MOV SOLVED, 'N'
+	MOV RES, 'N'
+  	MOV VERTICAL, 13  	 ;vertical position coordinates
+	MOV HORIZONTAL, 36  ;horizontal position coordinates
+	MOV DIRECTION, 04DH  	;which direction is it going to go
+	
+	; GOALS FOR PUZZLE 3
+	MOV AH, 08
+	MOV AL, 37
+	PUSH AX
+	MOV AH, 07
+	MOV AL, 38
+	PUSH AX
+	MOV AH, 08
+	MOV AL, 39
+	PUSH AX	
+	MOV AH, 07
+	MOV AL, 40
+	PUSH AX
+	MOV AH, 08
+	MOV AL, 41
+	PUSH AX
+	MOV AH, 07
+	MOV AL, 42
+	PUSH AX
+	MOV AH, 08
+	MOV AL, 43
+	PUSH AX
+	MOV SOP, SP
+	
+	; BOXES for puzzle 3
+	MOV AH, 13
+	MOV AL, 38
+	PUSH AX
+	MOV AH, 14
+	MOV AL, 39
+	PUSH AX
+	MOV AH, 12
+	MOV AL, 38
+	PUSH AX
+	MOV AH, 14
+	MOV AL, 42
+	PUSH AX
+	MOV AH, 13
+	MOV AL, 43
+	PUSH AX
+	MOV AH, 10
+	MOV AL, 42
+	PUSH AX
+	MOV AH, 10
+	MOV AL, 40
+	PUSH AX
+
+	MOV DX, OFFSET PUZZLE3
+	PUSH DX
+	CALL READ_PUZZLE_FILE
+
+	MOV TGC, 7
+	MOV RGC, 0
+	CALL GAME_LOOP
+
+	MOV CX, 14
+	POP_3:
+		POP AX
+	LOOP POP_3
+
+	CMP RES, 'N'
+	JE PUZZLE4_LOOP
+	JMP PUZZLE3_LOOP
+
+PUZZLE4_LOOP:
+	MOV SOLVED, 'N'
+	MOV RES, 'N'
+  	MOV VERTICAL, 13  	 ;vertical position coordinates
+	MOV HORIZONTAL, 37  ;horizontal position coordinates
+	MOV DIRECTION, 04DH  	;which direction is it going to go
+	
+	; ;GOALS for puzzle 4
+	MOV AH, 12
+	MOV AL, 39
+	PUSH AX
+	MOV AH, 12
+	MOV AL, 40
+	PUSH AX
+	MOV AH, 11
+	MOV AL, 39
+	PUSH AX
+	MOV AH, 11
+	MOV AL, 40
+	PUSH AX	
+	MOV SOP, SP
+
+	; ;BOXES FOR PUZZLE 4
+	mov ah, 12
+	mov al, 41
+	PUSH AX
+	MOV AH, 10
+	MOV AL, 39
+	PUSH AX
+	MOV AH, 10
+	MOV AL, 38
+	PUSH AX	
+	MOV AH, 10
+	MOV AL, 37
+	PUSH AX	
+
+	MOV DX, OFFSET PUZZLE4
+	PUSH DX
+	CALL READ_PUZZLE_FILE
+
+	MOV TGC, 4
+	MOV RGC, 0
+	CALL GAME_LOOP
+
+	MOV CX, 8
+	POP_4:
+		POP AX
+	LOOP POP_4
+
+	CMP RES, 'N'
+	JE PUZZLE5_LOOP
+	JMP PUZZLE4_LOOP
+
+PUZZLE5_LOOP:
+	MOV SOLVED, 'N'
+	MOV RES, 'N'
+  	MOV VERTICAL, 10  	 ;vertical position coordinates
+	MOV HORIZONTAL, 41  ;horizontal position coordinates
+	MOV DIRECTION, 04DH  	;which direction is it going to go
+	
+	; ;GOALS for puzzle 5
+	MOV AH, 10
+	MOV AL, 39
+	PUSH AX
+	MOV AH, 11
+	MOV AL, 39
+	PUSH AX
+	MOV AH, 12
+	MOV AL, 39
+	PUSH AX
+	MOV AH, 13
+	MOV AL, 39
+	PUSH AX
+	MOV AH, 14
+	MOV AL, 39
+	PUSH AX
+	MOV SOP, SP
+
+	;BOXES FOR PUZZLE 5
+	MOV AH, 09
+	MOV AL, 39
+	PUSH AX
+	mov ah, 10
+	mov al, 39
+	PUSH AX
+	MOV AH, 11
+	MOV AL, 39
+	PUSH AX	
+	MOV AH, 12
+	MOV AL, 39
+	PUSH AX
+	MOV AH, 13
+	MOV AL, 39
+	PUSH AX
+
+	MOV DX, OFFSET PUZZLE5
+	PUSH DX
+	CALL READ_PUZZLE_FILE
+
+	MOV TGC, 5
+	MOV RGC, 0
+	CALL GAME_LOOP
+
+	MOV CX, 10
+	POP_5:
+		POP AX
+	LOOP POP_5
+
+	CMP RES, 'N'
+	JE MAIN_LOOP_EXIT
+	JMP PUZZLE5_LOOP
+
+	MOV AF, 'Y'
+	MAIN_LOOP_EXIT:	
+	JMP GAME_OVER_EX
 START_PUZZLE_LOOPING ENDP
 ;----------------------------------------------------
 DRAW_SCORE PROC NEAR
@@ -220,49 +453,93 @@ DRAW_SCORE PROC NEAR
 	PUSH DX 
 	CALL SET_CURSOR	
 	MOV AH, 09H
+	LEA DX, PROMPT 
+	INT 21H
 	LEA DX, SCORE
+	INT 21H
+
+	MOV DH, 23
+	MOV DL, 40
+	PUSH DX 
+	CALL SET_CURSOR
+	MOV AH, 09H
+	LEA DX, BES_PROMPT
+	INT 21H
+	LEA DX, BES_SCORE_STR
 	INT 21H
 	RET
 DRAW_SCORE ENDP
 ;----------------------------------------------------
-; STORE_GOALS PROC NEAR
-; 	MOV DH, 6
-; 	MOV DL, 25
-; 	MOV CX, 12	
-; 	  LOOP1:
-; 	    PUSH CX
-; 	    MOV DH, 6
-; 	    MOV BH, CX
-; 	    SUB 
-;         MOV CX, 30
-;           LOOP2:	        
-;             ADD DH, BH 
-;             ADD DL, BL
-;             MOV AH, 08H
-;             INT 10H
-;             CMP AL, '%'
-
-;             INC BL
-; 	      LOOP LOOP2:
-; 	    POP CX
-; 	    INC BH
-; 	  LOOP LOOP1
-; 	RET
-; STORE_GOALS ENDP
+WRITE_SCORE PROC NEAR
+CREATE_FILE:	;create file		
+	MOV AH, 3CH           ;request create file
+	MOV CX, 00            ;normal attribute
+	LEA DX, WRITEPATHFILENAME  ;load path and file name
+	INT 21H
+	JC WDISPLAY_ERROR1     ;if there's error in creating file, carry flag = 1, otherwise 0
+	MOV WRITEFILEHANDLE, AX	
+	MOV AH, 40H           ;request write record
+	MOV BX, WRITEFILEHANDLE    ;file handle
+	MOV CX, 7            ;record length
+	LEA DX, SCORE    ;address of output area
+	INT 21H
+	JC WDISPLAY_ERROR2     ;if carry flag = 1, there's error in writing (nothing is written)
+	CMP AX, CTR            ;after writing, set AX to size of chars nga na write
+	JNE WDISPLAY_ERROR3	
+	MOV AH, 3EH           ;request close file
+	MOV BX, WRITEFILEHANDLE  ;file handle
+	INT 21H
+	JMP EX_WRITE
+WDISPLAY_ERROR1:
+	LEA DX, ERROR1_WSTR	
+	JMP WERR_DISPLAY
+WDISPLAY_ERROR2:
+	LEA DX, ERROR2_WSTR	
+	JMP WERR_DISPLAY
+WDISPLAY_ERROR3:
+	LEA DX, ERROR3_WSTR	
+	JMP WERR_DISPLAY
+WERR_DISPLAY:
+	MOV AH, 09H
+	INT 21H
+EX_WRITE:
+	RET
+WRITE_SCORE ENDP
 ;----------------------------------------------------
-; STORE_BOXES PROC NEAR
-; 	MOV CX, 12
-; 	  LOOP1:
-; 	    PUSH CX
-;         MOV CX, 30
-;           LOOP2:	        
+GET_BEST_SCORE PROC NEAR
+	MOV DX, OFFSET WRITEPATHFILENAME
+	PUSH DX
+	CALL OPEN_FILE
 
-; 	      LOOP LOOP2:
-; 	    POP CX
+	CLD               ;clear direction flag (left to right)
+    MOV CX, 7        ;initializes CX (counter) to 16 bytes
+    LEA DI, BES_SCORE_STR  ;initialize receiving/destination address
+    LEA SI, RECORD_STR  ;initialize sending/source address
+    REP MOVSB         ;copy MESSAGE1 to MESSAGE2 byte by byte (repeatedly for 16 times)                    
+	RET
+GET_BEST_SCORE ENDP
+;----------------------------------------------------
+CONVERT_SCORE_FROM_FILE PROC NEAR
+	MOV SI, OFFSET BES_SCORE_STR + 6
+	MOV BX, 0
+	MOV BP, 1	
+	MOV CX, 1	
+rpt:
+	MOV AL, [SI]
+	SUB AL, 48
+	MOV AH, 0
+	MUL BP
+	ADD BX, AX
+	MOV AX, BP
+	MOV BP, 10
+	MUL BP
+	MOV BP, AX
+	DEC SI
+	LOOP RPT
 
-; 	  LOOP LOOP1
-; 	RET
-; STORE_BOXES ENDP
+	MOV BES_SCORE, BX
+	RET
+CONVERT_SCORE_FROM_FILE ENDP
 ;----------------------------------------------------
 INITIAL_CURSOR PROC NEAR
   MOV DX, OFFSET INITIAL
@@ -275,6 +552,12 @@ OPEN_FILE PROC NEAR
   POP BX
   POP DX
   PUSH BX
+
+  MOV CX, FILESIZE
+  CLD 
+  MOV DI, OFFSET RECORD_STR
+  MOV SI, OFFSET COPY 
+  REP MOVSB
 
   MOV AH, 3DH           ;requst open file
   MOV AL, 00            ;read only; 01 (write only); 10 (read/write)
@@ -296,9 +579,9 @@ OPEN_FILE PROC NEAR
   JE DISPLAY_ERROR3
 
   ;display record
-  MOV DX, OFFSET RECORD_STR
-  MOV AH, 09
-  INT 21H
+  ; MOV DX, OFFSET RECORD_STR
+  ; MOV AH, 09
+  ; INT 21H
 
   ;close file handle
   MOV AH, 3EH           ;request close file
@@ -357,12 +640,13 @@ GAME_LOOP PROC NEAR
 	  MOV DH, VERTICAL
 	  PUSH DX
 	  CALL SET_CURSOR
-	  CALL DRAW_SCORE
 	  LEA DX, CURSOR
 	  PUSH DX	 
 	  CALL DISPLAY
-	  ; insert the checking of the boxes-slots here	  
-	  ; if complete, jmp puzzle_exit	  
+	  ; INSERT CONVERSION
+	  CALL CONVERT_SCORE
+	  CALL DRAW_SCORE
+
 	  CALL DELAY
 	  MOV N_M, 'Y'
 	  CALL GET_KEY
@@ -381,8 +665,10 @@ GAME_LOOP PROC NEAR
 	  CMP AL, 'r'
 	  JE RESET
 	  CMP AL, 1BH
-	  JNE TEMP_PROC
-	  JMP PUZZLE_EXIT
+	  JE EXIT_CURRENT
+	  JMP ITERATE
+EXIT_CURRENT:
+	  JMP GAME_OVER_EX
 RESET: 
 	MOV RES, 'Y'
 	JMP PUZZLE_EXIT
@@ -485,17 +771,64 @@ DOWN:
 	JMP ITERATE
 GAME_LOOP ENDP
 ;---------------------------------------------------
+CONVERT_SCORE PROC NEAR
+	MOV SI, OFFSET SCORE + 6
+	MOV BX, 10	
+	MOV AX, PLAYER_PUSHNUM
+	
+	MOV CX, 6
+	CON_L:
+	MOV DX, 0000H
+	CMP AX, 00H
+	JE CON_PROC
+	DIV BX 
+	ADD DL, 48
+	MOV BYTE PTR[SI], DL 
+	DEC SI
+	CON_PROC:
+	LOOP CON_L
+	RET_CON_L:
+	RET
+CONVERT_SCORE ENDP
+;---------------------------------------------------
+CONVERT_BEST_SCORE PROC NEAR
+	MOV SI, OFFSET BES_SCORE_STR + 6
+	MOV BX, 10	
+	MOV AX, BES_SCORE
+	
+	MOV CX, 6
+	CON_L_H:
+	MOV DX, 0000H
+	CMP AX, 00H
+	JE CON_PROC_H
+	DIV BX 
+	ADD DL, 48
+	MOV BYTE PTR[SI], DL 
+	DEC SI
+	CON_PROC_H:
+	LOOP CON_L_H
+	RET_CON_L_H:	
+	RET
+CONVERT_BEST_SCORE ENDP
+;---------------------------------------------------
 READ_PUZZLE_FILE PROC NEAR
 	pop bx 
 	pop dx 
 	push bx
+
+	MOV CX, FILESIZE
+	CLD 
+	MOV DI, OFFSET PUZZLE_STR
+	MOV SI, OFFSET COPY 
+    REP MOVSB
+
 	MOV AH, 3DH           
 	MOV AL, 00            
 	INT 21H	
 	JC RDISPLAY_ERROR1
-	MOV FILEHANDLE1, AX	
+	MOV PUZFILEHANDLE, AX	
 	MOV AH, 3FH           
-	MOV BX, FILEHANDLE1   
+	MOV BX, PUZFILEHANDLE   
 	MOV CX, 1000          
 	LEA DX, PUZZLE_STR    
 	INT 21H
@@ -503,19 +836,19 @@ READ_PUZZLE_FILE PROC NEAR
 	CMP AX, 00            
 	JE RDISPLAY_ERROR3	
   	MOV AH, 3EH           
-  	MOV BX, FILEHANDLE1   
+  	MOV BX, PUZFILEHANDLE   
   	INT 21H
   	JMP CLOSE_FILE  	
 RDISPLAY_ERROR1:
   	LEA DX, ERROR1_RSTR  	
-  	JMP ERR_DISPLAY
+  	JMP RERR_DISPLAY
 RDISPLAY_ERROR2:
   	LEA DX, ERROR2_RSTR	
-	JMP ERR_DISPLAY
+	JMP RERR_DISPLAY
 RDISPLAY_ERROR3:
 	LEA DX, ERROR3_RSTR	
-	JMP ERR_DISPLAY
-ERR_DISPLAY:	
+	JMP RERR_DISPLAY
+RERR_DISPLAY:	
 	MOV AH, 09H
 	INT 21H
 CLOSE_FILE:
@@ -656,6 +989,83 @@ DRAW_GOALS PROC NEAR
   RET
 DRAW_GOALS ENDP
 ;----------------------------------------------------
+GAME_OVER_EX PROC NEAR
+	CALL INITIAL_CURSOR
+	CALL _CLEAR_SCREEN
+	MOV DX, OFFSET GAMEOVER
+	PUSH DX
+	CALL OPEN_FILE
+	MOV AH, 09H
+	MOV DX, OFFSET RECORD_STR
+	INT 21H
+	MOV DH, 21
+	MOV DL, 30
+	PUSH DX 
+	CALL SET_CURSOR	
+	MOV AH, 09H
+	LEA DX, PROMPT 
+	INT 21H
+	LEA DX, SCORE
+	INT 21H
+
+	MOV AX, GAME_AGAIN
+	MOV ARROW_POS, AX
+	CHOOSE_GAME_OVER:
+		MOV DX, ARROW_POS
+		PUSH DX
+
+		CALL SET_CURSOR
+		MOV AL, 02H
+		MOV DL, ARROW
+		INT 21H
+
+		CALL GET_KEY
+		MOV AL, INPUT
+
+		CMP AL, LEFT_ARROW
+		JE LEFT_INST_GAME_OVER
+
+		CMP AL, RIGHT_ARROW
+		JE RIGHT_INST_GAME_OVER
+
+		CMP AL, ENTER_KEY
+		JE CHECK_INST3
+
+		CHECK_INST3:
+			MOV PLAYER_PUSHNUM, 0
+			MOV AX, GAME_EXIT
+			CMP ARROW_POS, AX
+			JE NEW_EXIT_OVER
+			;PLEASE CHANGE THIS PART		
+			MOV AX, GAME_AGAIN
+			CMP ARROW_POS, AX
+			JE CHOOSE_MENU_J
+
+		CHOOSE_MENU_J:
+			JMP CHOOSE_MENU
+		NEW_EXIT_OVER:
+			CMP AF, 'Y'
+			JE WRITE_F
+			JMP WRITE_S
+		WRITE_F:
+			JMP MAIN_EXIT
+
+		JMP CHOOSE_GAME_OVER
+		PROC5:
+			JMP START_PUZZLE_LOOPING
+		LEFT_INST_GAME_OVER:
+			CALL _CLEAR
+			MOV AX, GAME_AGAIN
+			MOV ARROW_POS, AX
+			JMP CHOOSE_GAME_OVER
+
+		RIGHT_INST_GAME_OVER:
+			CALL _CLEAR
+			MOV AX, GAME_EXIT
+			MOV ARROW_POS, AX
+			JMP CHOOSE_GAME_OVER
+GAME_OVER_EX ENDP
+;----------------------------------------------------
 CHECK_GOALS PROC NEAR
 	MOV AH, 08H
 	INT 10H
@@ -746,6 +1156,9 @@ CHOOSE_MENU PROC NEAR
   MOV DX, OFFSET STARTSCREEN
   PUSH DX
   CALL OPEN_FILE
+  MOV DX, OFFSET RECORD_STR
+  MOV AH, 09H
+  INT 21H
 
   MOV AX, ARROW_POS_START
   MOV ARROW_POS, AX
@@ -795,8 +1208,7 @@ CHOOSE_MENU PROC NEAR
       JE HOW_INST
 
       NEW_EXIT:
-        MOV AH, 4CH
-        INT 21H
+        JMP GAME_OVER_EX
     DOWN_MKEY:
       MOV AX, ARROW_POS_START
       CMP ARROW_POS, AX ;OFFSET ARROW_POS_START
@@ -843,10 +1255,14 @@ CHOOSE_MENU ENDP
 ;---------------------------------------------------
 HOW_INST PROC NEAR
   CALL INITIAL_CURSOR
+  CALL CLEAR_SCREEN
   CALL _CLEAR_SCREEN
   MOV DX, OFFSET HOWSCREEN
   PUSH DX
   CALL OPEN_FILE
+  MOV DX, OFFSET RECORD_STR
+  MOV AH, 09H
+  INT 21H
 
   MOV AX, HOW_BACK
   MOV ARROW_POS, AX
@@ -875,6 +1291,13 @@ HOW_INST PROC NEAR
       MOV AX, HOW_BACK
       CMP ARROW_POS, AX
       JE EXTRA_JMP
+      MOV AX, HOW_START
+      CMP ARROW_POS, AX
+      JE START_GAME
+    
+    START_GAME:
+      JMP START_PUZZLE_LOOPING
+
 
       JMP CHOOSE
     LEFT_INST:
@@ -905,7 +1328,7 @@ HOW_INST ENDP
 ;---------------------------------------------------
 _CLEAR PROC NEAR 					;CLEARS THE ARROW
   MOV AX, 0600H
-  MOV BH, 71H
+  MOV BH, 04H
   MOV CX, ARROW_POS
   MOV DX, ARROW_POS
   INT 10H
@@ -914,7 +1337,7 @@ _CLEAR ENDP
 ;---------------------------------------------------
 _CLEAR_SCREEN PROC	NEAR
     MOV		AX, 0600H
-    MOV		BH, 71H
+    MOV		BH, 04H
     MOV 	CX, 0000H
     MOV		DX, 184FH
     INT		10H
